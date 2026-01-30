@@ -1,41 +1,305 @@
-# Prerequisites
-*.d
+# ============================================================================
+# DirectX12 3D Engine - Portfolio Project
+# ============================================================================
+# This .gitignore ensures:
+# 1. NO binaries/compiled files
+# 2. NO build artifacts
+# 3. NO personal machine data
+# 4. Only source code and essential configs
+# ============================================================================
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# ============================================================================
+# PROJECT-SPECIFIC OUTPUTS
+# ============================================================================
 
-# Precompiled Headers
-*.gch
-*.pch
+# Your CMake-defined output directory (GameDemo/)
+GameDemo/
 
-# Linker files
-*.ilk
+# Build directories
+build*/
+out/
+dist/
+bin/
+x64/
+x86/
+ARM/
+ARM64/
 
-# Debugger Files
-*.pdb
+# Configuration directories
+[Dd]ebug*/
+[Rr]elease*/
+[Rr]eleaseWithDebInfo*/
+[Mm]inSizeRel*/
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+# Visual Studio solution user files (PERSONAL DATA)
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+*.vcxproj.filters
 
-# Fortran module files
-*.mod
-*.smod
+# Visual Studio cache directory
+.vs/
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+# CMake build files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# CMake user presets (can contain machine paths)
+CMakeUserPresets.json
+CMakePresets.json.user
+
+# ============================================================================
+# COMPILED FILES & EXECUTABLES
+# ============================================================================
 
 # Executables
 *.exe
 *.out
 *.app
 
-# debug information files
-*.dwo
+# DLLs and shared libraries
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Static libraries
+*.lib
+*.a
+*.la
+*.lo
+*.o
+*.obj
+
+# Debug symbols
+*.pdb
+*.idb
+*.ipdb
+
+# Intermediate files
+*.ilk
+*.map
+*.exp
+*.res
+*.tlog
+*.lastbuildstate
+*.iobj
+*.ipdb
+*.pgc
+*.pgd
+
+# ============================================================================
+# DEPENDENCIES & PACKAGES
+# ============================================================================
+
+# NuGet packages
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ============================================================================
+# IDE & EDITOR FILES
+# ============================================================================
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/tasks.json.example
+!.vscode/launch.json.example
+!.vscode/extensions.json.example
+*.code-workspace
+
+# Visual Studio
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Eclipse
+.metadata/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+
+# ============================================================================
+# OPERATING SYSTEM FILES
+# ============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.fseventsd
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# TEMPORARY & BACKUP FILES
+# ============================================================================
+
+# Backup files
+*.bak
+*.gho
+*.ori
+*.orig
+*.tmp
+*.temp
+*_Backup*
+Backup*/
+_UpgradeReport_Files/
+
+# Auto-save files
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+*.sw[a-p]
+*.un~
+
+# ============================================================================
+# TEST & LOG FILES
+# ============================================================================
+
+# Logs
+*.log
+*.tlog
+*.log.*
+logs/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.xml
+*.json
+
+# Coverage
+coverage/
+*.gcda
+*.gcno
+*.lcov
+
+# ============================================================================
+# SHADER INTERMEDIATE FILES (DX12 SPECIFIC)
+# ============================================================================
+
+# HLSL compiled shaders
+*.cso
+*.fxc
+*.hlsl.i
+*.hlsl.obj
+
+# Shader debug files
+*.pdb
+*.lld
+
+# ============================================================================
+# PERSONAL & MACHINE-SPECIFIC FILES
+# ============================================================================
+
+# Git credentials
+.git-credentials
+.gitconfig.local
+
+# Environment files
+.env
+.env.local
+.secrets
+
+# Machine-specific configs
+machine.config
+user.config
+
+# ============================================================================
+# DOCUMENTATION GENERATED FILES
+# ============================================================================
+
+# Doxygen
+doxygen/
+docs/html/
+docs/latex/
+
+# ============================================================================
+# KEEP THESE - THEY SHOULD BE COMMITTED
+# ============================================================================
+# !CMakeLists.txt           # Keep - defines build
+# !*.h                      # Keep - headers
+# !*.cpp                    # Keep - source files
+# !*.hlsl                   # Keep - shaders
+# !LICENSE                  # Keep - license
+# !README.md                # Keep - documentation
+# !.gitignore               # Keep - this file
+# !.gitattributes           # Keep - if exists
+
+# ============================================================================
+# SPECIAL NOTES
+# ============================================================================
+# This project uses CMake for building
+# Required files to build:
+# 1. All CMakeLists.txt files
+# 2. All source files (.h, .cpp, .hlsl)
+# 3. README.md with build instructions
+# 4. This .gitignore file
+# ============================================================================
