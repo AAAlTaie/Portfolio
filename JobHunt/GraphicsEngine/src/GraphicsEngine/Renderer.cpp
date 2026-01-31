@@ -93,7 +93,6 @@ bool Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 {
     m_hwnd = hwnd;
     m_width = width; m_height = height;
-
     if (!CreateDevice())                      return false;
     if (!CreateCommandObjects())              return false;
     if (!CreateSwapchainAndRTVs(hwnd, width, height)) return false;
@@ -101,19 +100,15 @@ bool Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
     if (!CreateRootAndPSO())                  return false;
     if (!CreateGeometry())                    return false;
     if (!CreateShadowMap(2048))               return false;
-
     // Cameras
     m_camera.SetLens(to_radians(60.0f), float(width) / float(height), 0.1f, 500.0f);
     m_camera.SetPosition({ -5.0f, 3.0f, -5.0f });
     m_camera.YawPitch(+0.7f, -0.2f);
-
     m_playerCam.SetLens(to_radians(60.0f), float(width) / float(height), 0.1f, 5.0f);
     m_playerCam.SetPosition({ 0.0f, 0.5f, 0.0f });
-
     // Seed culling override from player cam
     m_cullNear = m_playerCam.GetNearZ();
     m_cullFar = m_playerCam.GetFarZ();
-
     // Random debug boxes
     uint32_t seed = 1337u;
     auto r01 = [&]() { seed = seed * 1664525u + 1013904223u; return float((seed >> 8) & 0xFFFF) / 65535.0f; };
@@ -124,21 +119,26 @@ bool Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
         float3 col{ 0.4f + 0.6f * r01(), 0.4f + 0.6f * r01(), 0.4f + 0.6f * r01() };
         m_debugBoxes.push_back({ AABB_t{ c, e }, col });
     }
-
     // Frame-time graph priming
     for (float& v : m_frameTimes) v = 16.6f; // ~60 FPS baseline
     m_ftHead = 0;
-
     // Defaults / toggles
     m_vsync = true;
     m_camMode = CameraMode::Free;
     m_followDist = 4.0f;
     m_orbitDist = 6.0f;
     m_orbitFocus = { 0,0,0 };
-
     // Mouse params
     m_mouseSens = 0.0025f;
     m_mouseAccel = 0.00015f;
+
+    // ADD THESE LINES:
+    if (!m_dynamicUpload.Init(m_device.Get(), 64 * 1024 * 1024, kFrameCount))
+        return false;
+
+    m_hudVertices.reserve(4096);
+    m_boxLineVertices.reserve(200 * 24);
+    m_frustumVertices.reserve(64);
 
     return true;
 }
@@ -172,7 +172,7 @@ void Renderer::Shutdown()
     m_srvHeap.Reset();
     m_shadowTex.Reset();
 
-    m_transientUploads.clear();
+    //m_transientUploads.clear();
 
     m_device.Reset();
 }
@@ -233,6 +233,7 @@ bool Renderer::CreateSwapchainAndRTVs(HWND hwnd, uint32_t w, uint32_t h)
     sc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     sc.SampleDesc.Count = 1;
+    sc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     ComPtr<IDXGISwapChain1> tmp;
     ThrowIfFailed(f->CreateSwapChainForHwnd(m_cmdQueue.Get(), hwnd, &sc, nullptr, nullptr, &tmp));
@@ -468,7 +469,7 @@ bool Renderer::CreateRootAndPSO()
         D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_cbUpload)));
     ThrowIfFailed(m_cbUpload->Map(0, nullptr, reinterpret_cast<void**>(&m_cbMapped)));
     m_cbHead = 0;
-    m_transientUploads.clear();
+    //m_transientUploads.clear();
 
     return true;
 }
@@ -674,16 +675,20 @@ void Renderer::WaitForGPU() {
     }
 }
 void Renderer::MoveToNextFrame() {
-    UINT64 v = m_fenceValue;
-    ThrowIfFailed(m_cmdQueue->Signal(m_fence.Get(), v));
+    const UINT64 currentFenceValue = m_fenceValue;
+    ThrowIfFailed(m_cmdQueue->Signal(m_fence.Get(), currentFenceValue));
     m_fenceValue++;
+
     m_frameIndex = m_swapchain->GetCurrentBackBufferIndex();
-    if (m_fence->GetCompletedValue() < v) {
-        ThrowIfFailed(m_fence->SetEventOnCompletion(v, m_fenceEvent));
+
+    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex]) {
+        ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
+
+    m_fenceValues[m_frameIndex] = currentFenceValue;
     m_cbHead = 0;
-    m_transientUploads.clear();
+    // DON'T CALL Reset() here - it would free resources GPU is still using!
 }
 
 // ============================================================================
@@ -1053,7 +1058,7 @@ void Renderer::RecordDrawCalls(ID3D12GraphicsCommandList* cmd)
     // SOLID GROUND (white) for shadows
     {
         struct VPNC { float3 p; float3 n; float3 c; };
-        const float3 groundCol{ 0.5f, 0.5f, 0.5f }; // WHITE ground
+        const float3 groundCol{ 0.5f, 0.5f, 0.5f };
         VPNC ground[6] = {
             {{-50,0,-50},{0,1,0},groundCol},
             {{ 50,0,-50},{0,1,0},groundCol},
@@ -1064,22 +1069,22 @@ void Renderer::RecordDrawCalls(ID3D12GraphicsCommandList* cmd)
         };
 
         const UINT bytes = sizeof(ground);
-        ComPtr<ID3D12Resource> dyn; D3D12_HEAP_PROPERTIES hu{}; hu.Type = D3D12_HEAP_TYPE_UPLOAD;
-        D3D12_RESOURCE_DESC rd = MakeBufferDesc(bytes);
-        ThrowIfFailed(m_device->CreateCommittedResource(&hu, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dyn)));
-        void* mp = nullptr; ThrowIfFailed(dyn->Map(0, nullptr, &mp)); memcpy(mp, ground, bytes); dyn->Unmap(0, nullptr);
-        D3D12_VERTEX_BUFFER_VIEW vb{}; vb.BufferLocation = dyn->GetGPUVirtualAddress(); vb.StrideInBytes = sizeof(VPNC); vb.SizeInBytes = bytes;
+        auto alloc = m_dynamicUpload.Allocate(bytes, 256);
+        memcpy(alloc.cpuPtr, ground, bytes);
 
-        cmd->SetPipelineState(m_pso.Get());  // <--- LIT SHADER (NOT unlit!)
+        D3D12_VERTEX_BUFFER_VIEW vb{};
+        vb.BufferLocation = alloc.gpuAddress;
+        vb.StrideInBytes = sizeof(VPNC);
+        vb.SizeInBytes = bytes;
+
+        cmd->SetPipelineState(m_pso.Get());
         cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         cmd->IASetVertexBuffers(0, 1, &vb);
 
-        // USE PROPER LIGHTING
         float3 L = ComputeLightDir();
         bindMVP(m_identity(), m_lightEnabled ? L : float3{ 0,0,0 });
 
         cmd->DrawInstanced(6, 1, 0, 0);
-        m_transientUploads.push_back(dyn);
     }
 
     // GRID
@@ -1093,7 +1098,8 @@ void Renderer::RecordDrawCalls(ID3D12GraphicsCommandList* cmd)
 
     // RANDOMIZED BOXES (culled)
     if (m_showRandomCubes && !m_debugBoxes.empty()) {
-        std::vector<VertexPC> lines; lines.reserve(m_debugBoxes.size() * 24);
+        m_boxLineVertices.clear();
+
         auto addBox = [&](const AABB_t& b, const float3& col) {
             const float3 c = b.center, e = b.extents;
             const float3 p[8] = {
@@ -1103,25 +1109,31 @@ void Renderer::RecordDrawCalls(ID3D12GraphicsCommandList* cmd)
                 {c.x - e.x,c.y + e.y,c.z + e.z},{c.x + e.x,c.y + e.y,c.z + e.z}
             };
             static const int E[12][2] = { {0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{3,7},{2,6} };
-            for (int i = 0; i < 12; i++) { lines.push_back({ p[E[i][0]], col }); lines.push_back({ p[E[i][1]], col }); }
+            for (int i = 0; i < 12; i++) {
+                m_boxLineVertices.push_back({ p[E[i][0]], col });
+                m_boxLineVertices.push_back({ p[E[i][1]], col });
+            }
             };
-        for (const auto& bx : m_debugBoxes)
-            if (aabbIntersectsFrustum(bx.aabb, F)) addBox(bx.aabb, bx.color);
 
-        if (!lines.empty()) {
-            const UINT bytes = (UINT)lines.size() * (UINT)sizeof(VertexPC);
-            ComPtr<ID3D12Resource> dyn; D3D12_HEAP_PROPERTIES hu{}; hu.Type = D3D12_HEAP_TYPE_UPLOAD;
-            D3D12_RESOURCE_DESC rd = MakeBufferDesc(bytes);
-            ThrowIfFailed(m_device->CreateCommittedResource(&hu, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dyn)));
-            void* mp = nullptr; ThrowIfFailed(dyn->Map(0, nullptr, &mp)); memcpy(mp, lines.data(), bytes); dyn->Unmap(0, nullptr);
-            D3D12_VERTEX_BUFFER_VIEW v{}; v.BufferLocation = dyn->GetGPUVirtualAddress(); v.StrideInBytes = sizeof(VertexPC); v.SizeInBytes = bytes;
+        for (const auto& bx : m_debugBoxes)
+            if (aabbIntersectsFrustum(bx.aabb, F))
+                addBox(bx.aabb, bx.color);
+
+        if (!m_boxLineVertices.empty()) {
+            const UINT bytes = (UINT)m_boxLineVertices.size() * (UINT)sizeof(VertexPC);
+            auto alloc = m_dynamicUpload.Allocate(bytes, 256);
+            memcpy(alloc.cpuPtr, m_boxLineVertices.data(), bytes);
+
+            D3D12_VERTEX_BUFFER_VIEW v{};
+            v.BufferLocation = alloc.gpuAddress;
+            v.StrideInBytes = sizeof(VertexPC);
+            v.SizeInBytes = bytes;
 
             cmd->SetPipelineState(m_psoLines.Get());
             cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
             cmd->IASetVertexBuffers(0, 1, &v);
             bindMVP_Lines(m_identity(), 2.5f);
-            cmd->DrawInstanced((UINT)lines.size(), 1, 0, 0);
-            m_transientUploads.push_back(dyn);
+            cmd->DrawInstanced((UINT)m_boxLineVertices.size(), 1, 0, 0);
         }
     }
 
@@ -1186,11 +1198,13 @@ void Renderer::RecordDrawCalls(ID3D12GraphicsCommandList* cmd)
 
         const UINT bytes = (UINT)fr.size() * (UINT)sizeof(VertexPC);
         if (bytes) {
-            ComPtr<ID3D12Resource> dyn; D3D12_HEAP_PROPERTIES hu{}; hu.Type = D3D12_HEAP_TYPE_UPLOAD;
-            D3D12_RESOURCE_DESC rd = MakeBufferDesc(bytes);
-            ThrowIfFailed(m_device->CreateCommittedResource(&hu, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dyn)));
-            void* mp = nullptr; ThrowIfFailed(dyn->Map(0, nullptr, &mp)); memcpy(mp, fr.data(), bytes); dyn->Unmap(0, nullptr);
-            D3D12_VERTEX_BUFFER_VIEW vb{}; vb.BufferLocation = dyn->GetGPUVirtualAddress(); vb.StrideInBytes = sizeof(VertexPC); vb.SizeInBytes = bytes;
+            auto alloc = m_dynamicUpload.Allocate(bytes, 256);
+            memcpy(alloc.cpuPtr, fr.data(), bytes);
+
+            D3D12_VERTEX_BUFFER_VIEW vb{};
+            vb.BufferLocation = alloc.gpuAddress;
+            vb.StrideInBytes = sizeof(VertexPC);
+            vb.SizeInBytes = bytes;
 
             cmd->SetPipelineState(m_psoLines.Get());
             cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
@@ -1198,7 +1212,7 @@ void Renderer::RecordDrawCalls(ID3D12GraphicsCommandList* cmd)
             bindMVP_Lines(m_identity(), 2.5f);
             cmd->DrawInstanced((UINT)fr.size(), 1, 0, 0);
 
-            m_transientUploads.push_back(dyn);
+            //m_transientUploads.push_back(dyn);
         }
     }
 }
@@ -1335,21 +1349,16 @@ void Renderer::RenderHUD(ID3D12GraphicsCommandList* cmd)
     if (hud.empty()) return;
 
     // Upload vertices
+    // Upload vertices
     const UINT bytes = (UINT)(hud.size() * sizeof(Vtx));
-    ComPtr<ID3D12Resource> dyn;
-    D3D12_HEAP_PROPERTIES hu{}; hu.Type = D3D12_HEAP_TYPE_UPLOAD;
-    D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; rd.Width = bytes;
-    rd.Height = 1; rd.DepthOrArraySize = 1; rd.MipLevels = 1; rd.Format = DXGI_FORMAT_UNKNOWN;
-    rd.SampleDesc.Count = 1; rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    ThrowIfFailed(m_device->CreateCommittedResource(&hu, D3D12_HEAP_FLAG_NONE, &rd,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dyn)));
-    void* mp = nullptr; ThrowIfFailed(dyn->Map(0, nullptr, &mp)); memcpy(mp, hud.data(), bytes); dyn->Unmap(0, nullptr);
+    auto alloc = m_dynamicUpload.Allocate(bytes, 256);
+    memcpy(alloc.cpuPtr, hud.data(), bytes);
 
     D3D12_VERTEX_BUFFER_VIEW vb{};
-    vb.BufferLocation = dyn->GetGPUVirtualAddress();
+    vb.BufferLocation = alloc.gpuAddress;
     vb.StrideInBytes = sizeof(Vtx);
     vb.SizeInBytes = bytes;
+
 
     // Pixel-space ortho
     const float l = 0, r = W, t = 0, b = H, zn = 0, zf = 1;
@@ -1384,7 +1393,7 @@ void Renderer::RenderHUD(ID3D12GraphicsCommandList* cmd)
     bindHUD(m_identity());
     cmd->DrawInstanced((UINT)hud.size(), 1, 0, 0);
 
-    m_transientUploads.push_back(dyn);
+    //m_transientUploads.push_back(dyn);
 }
 
 
@@ -1449,6 +1458,14 @@ void Renderer::RenderShadowPass(ID3D12GraphicsCommandList* cmd)
 void Renderer::Render()
 {
     auto t0 = std::chrono::high_resolution_clock::now();
+
+    // Wait for this frame's command allocator to be free before using it
+    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex]) {
+        ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
+
+    m_dynamicUpload.BeginFrame(m_frameIndex);
 
     ThrowIfFailed(m_cmdAlloc[m_frameIndex]->Reset());
     ThrowIfFailed(m_cmdList->Reset(m_cmdAlloc[m_frameIndex].Get(), nullptr));
