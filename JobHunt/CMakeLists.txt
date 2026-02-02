@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.30)
 
 project(Proj LANGUAGES CXX)
@@ -49,9 +48,13 @@ function(set_common_output_dirs tgt)
   endif()
 endfunction()
 
-add_subdirectory(PhysicsEngine)
+# Add dependencies in build order
 add_subdirectory(GraphicsEngine)
+add_subdirectory(PhysicsEngine)
 add_subdirectory(Game)
 
-# Ensure order
-add_dependencies(Game GraphicsEngine PhysicsEngine)
+# Ensure linking order (Game depends on both DLLs)
+target_link_libraries(Game PRIVATE GraphicsEngine PhysicsEngine)
+
+# Set Game as startup project for Visual Studio (AFTER all targets are defined)
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Game)

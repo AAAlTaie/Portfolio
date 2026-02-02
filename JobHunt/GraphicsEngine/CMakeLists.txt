@@ -1,14 +1,27 @@
-
 cmake_minimum_required(VERSION 3.30)
 
-# GraphicsEngine sources
-file(GLOB_RECURSE GE_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+# Explicit header files list
+set(GE_HEADERS
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Camera.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/D3D12Helpers.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Memory/DescriptorRing.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Memory/DescriptorSystem.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Export.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/FrameResources.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Geometry.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/GraphicsEngine.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Memory/LinearArena.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Renderer.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/SolMath.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Memory/UploadAlloc.h"
 )
-file(GLOB_RECURSE GE_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+
+# Explicit source files list  
+set(GE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Camera.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Geometry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/GraphicsEngine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp"
 )
 
 add_library(GraphicsEngine SHARED ${GE_HEADERS} ${GE_SOURCES})

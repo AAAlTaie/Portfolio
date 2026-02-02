@@ -3,8 +3,8 @@
 #include <string>
 #include <chrono>
 #include <thread>
-#include "GraphicsEngine/GraphicsEngine.h"
-#include "GraphicsEngine/Renderer.h"
+#include "GraphicsEngine.h"
+#include "Renderer.h"
 
 using namespace GraphicsEngine;
 

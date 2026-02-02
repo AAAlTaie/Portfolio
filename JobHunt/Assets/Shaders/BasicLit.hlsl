@@ -47,34 +47,31 @@ PSIn VSMainLit(VSIn i)
     o.color = i.color;
     return o;
 }
+
 float ShadowFactor(float4 lightPos)
 {
     // Project to NDC then to UV
-    float3 p = lightPos.xyz / max(lightPos.w, 1e-6);
+    float3 p = lightPos.xyz / max(lightPos.w, 1e-6f);
     
     // FIX: Use correct D3D clip space Y direction
     float2 uv = float2(p.x * 0.5f + 0.5f, p.y * -0.5f + 0.5f);
 
     // Sample only if within map
-    bool inRange = (uv.x >= 0.0 && uv.x <= 1.0 &&
-                    uv.y >= 0.0 && uv.y <= 1.0 &&
-                    p.z >= 0.0 && p.z <= 1.0);
+    bool inRange = (uv.x >= 0.0f && uv.x <= 1.0f &&
+                    uv.y >= 0.0f && uv.y <= 1.0f &&
+                    p.z >= 0.0f && p.z <= 1.0f);
     
     if (!inRange)
     {
         return 1.0f; // Outside shadow map = fully lit
     }
-    
-    float mapDepth = ShadowMap.SampleLevel(LinearClamp, uv, 0);
-    
-    // FIX: Better bias calculation for orthographic projection
-    const float depthBias = 0.0005f;
-    const float normalBias = 0.01f;
-    
-    // For orthographic projection (directional light), use simple bias
-    float bias = depthBias;
-    
-    return (p.z > mapDepth + bias) ? 0.0 : 1.0;
+    else
+    {
+        float mapDepth = ShadowMap.SampleLevel(LinearClamp, uv, 0).r;
+        const float depthBias = 0.0005f;
+        float bias = depthBias;
+        return (p.z > mapDepth + bias) ? 0.0f : 1.0f;
+    }
 }
 
 float4 PSMainLit(PSIn i) : SV_Target

@@ -1,26 +1,19 @@
-
 cmake_minimum_required(VERSION 3.30)
 
-# Game sources
-file(GLOB_RECURSE GAME_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
-)
-file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+# Explicit source files list (adjust based on your actual files)
+set(GAME_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    # Add other .cpp files here as you create them
 )
 
-add_executable(Game WIN32 ${GAME_HEADERS} ${GAME_SOURCES})
+add_executable(Game WIN32 ${GAME_SOURCES})
 
 target_compile_definitions(Game PRIVATE _UNICODE UNICODE)
-target_include_directories(Game PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../GraphicsEngine/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../PhysicsEngine/include"
-)
+
+# Link to libraries - CMake will handle include directories automatically
 target_link_libraries(Game PRIVATE GraphicsEngine PhysicsEngine d3d12 dxgi d3dcompiler)
 
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${GAME_HEADERS} ${GAME_SOURCES})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${GAME_SOURCES})
 
 if (MSVC)
     target_compile_options(Game PRIVATE /W4 /permissive- /Zc:__cplusplus /EHsc /wd4251 /wd4275)

@@ -1,14 +1,13 @@
-
 cmake_minimum_required(VERSION 3.30)
 
-# PhysicsEngine sources
-file(GLOB_RECURSE PE_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+# Explicit header files list
+set(PE_HEADERS
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Physics.h"
 )
-file(GLOB_RECURSE PE_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+
+# Explicit source files list
+set(PE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Physics.cpp"
 )
 
 add_library(PhysicsEngine SHARED ${PE_HEADERS} ${PE_SOURCES})
